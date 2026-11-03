@@ -611,7 +611,7 @@ if ($role === 'admin') {
                 <div class="hero-top">
                     <div class="hero-copy">
                         <div class="hero-badge"><i class="fa-solid fa-sparkles"></i> </div>
-                        <h1><?php echo $role === 'admin' ? 'Manage your tool rental platform smarter' : 'RENT YOUR TOOL NOW!'; ?></h1>
+                        <h1><?php echo $role === 'admin' ? 'Manage your tool rental platform smarter' : 'Find and Rent the Tools You Need'; ?></h1>
                         <p>
                             <?php if ($role === 'admin'): ?>
                                 Monitor users, manage listings, handle rental requests, and verify renter payments in one polished admin workspace.
