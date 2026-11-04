@@ -11,21 +11,45 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     die("Access denied.");
 }
 
-$ownerId = (int)$_SESSION['user_id'];
+$ownerId = (int) $_SESSION['user_id'];
 
-// FETCH TOOLS (UNCHANGED LOGIC)
+if (
+    !isset($_SESSION['delete_tool_csrf']) ||
+    !is_string($_SESSION['delete_tool_csrf'])
+) {
+    $_SESSION['delete_tool_csrf'] = bin2hex(random_bytes(32));
+}
+
+$deleteToken = $_SESSION['delete_tool_csrf'];
+
+$deleteFlash = $_SESSION['delete_tool_flash'] ?? null;
+unset($_SESSION['delete_tool_flash']);
+
+$deleteMessage = (
+    is_array($deleteFlash) &&
+    isset($deleteFlash['message']) &&
+    is_string($deleteFlash['message'])
+) ? $deleteFlash['message'] : '';
+
+$deleteMessageType = (
+    is_array($deleteFlash) &&
+    ($deleteFlash['type'] ?? '') === 'success'
+) ? 'success' : 'error';
+
 $stmt = $conn->prepare("
     SELECT *
     FROM tools
     WHERE owner_id = ?
     ORDER BY id DESC
 ");
+
 $stmt->bind_param("i", $ownerId);
 $stmt->execute();
 $result = $stmt->get_result();
 
-function e($v){
-    return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+function e($v)
+{
+    return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 }
 ?>
 
@@ -55,7 +79,6 @@ body{
         linear-gradient(180deg,var(--bg1),var(--bg2));
 }
 
-/* NAVBAR */
 .navbar{
     display:flex;
     justify-content:space-between;
@@ -74,7 +97,6 @@ body{
     color:#1e293b;
 }
 
-/* CONTAINER */
 .container{
     max-width:1200px;
     margin:auto;
@@ -88,14 +110,12 @@ body{
     border:1px solid var(--border);
 }
 
-/* GRID */
 .grid{
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
     gap:20px;
 }
 
-/* TOOL CARD */
 .tool{
     background:white;
     border-radius:20px;
@@ -108,7 +128,6 @@ body{
     transform:translateY(-5px);
 }
 
-/* IMAGE */
 .img{
     height:200px;
     background:#e5e7eb;
@@ -120,7 +139,6 @@ body{
     object-fit:cover;
 }
 
-/* BODY */
 .body{
     padding:16px;
 }
@@ -135,7 +153,6 @@ body{
     font-size:.9rem;
 }
 
-/* BADGES */
 .badge{
     display:inline-block;
     margin-top:8px;
@@ -148,11 +165,15 @@ body{
 .available{background:#dcfce7;color:#166534;}
 .unavailable{background:#fee2e2;color:#991b1b;}
 
-/* BUTTONS */
 .actions{
     margin-top:12px;
     display:flex;
+    align-items:center;
     gap:10px;
+}
+
+.delete-form{
+    margin:0;
 }
 
 .btn{
@@ -163,10 +184,21 @@ body{
     cursor:pointer;
     text-decoration:none;
     color:white;
+    font-family:inherit;
+    font-size:inherit;
 }
 
 .edit{background:#2563eb;}
 .delete{background:#ef4444;}
+
+.message{
+    padding:12px 14px;
+    margin-bottom:18px;
+    border-radius:12px;
+}
+
+.message.success{background:#dcfce7;color:#166534;}
+.message.error{background:#fee2e2;color:#991b1b;}
 </style>
 </head>
 
@@ -187,37 +219,83 @@ body{
 
         <h2>My Tools</h2>
 
+        <?php if ($deleteMessage !== ''): ?>
+            <div
+                class="message <?php echo e($deleteMessageType); ?>"
+                role="status"
+            >
+                <?php echo e($deleteMessage); ?>
+            </div>
+        <?php endif; ?>
+
         <div class="grid">
 
-        <?php while ($tool = $result->fetch_assoc()): ?>
+            <?php while ($tool = $result->fetch_assoc()): ?>
 
-            <div class="tool">
+                <div class="tool">
 
-                <div class="img">
-                    <?php if (!empty($tool['image_path'])): ?>
-                        <img src="uploads/<?php echo e($tool['image_path']); ?>">
-                    <?php endif; ?>
-                </div>
-
-                <div class="body">
-
-                    <div class="title"><?php echo e($tool['tool_name']); ?></div>
-                    <div class="location"><?php echo e($tool['location']); ?></div>
-
-                    <div class="badge <?php echo $tool['availability_status']; ?>">
-                        <?php echo e($tool['availability_status']); ?>
+                    <div class="img">
+                        <?php if (!empty($tool['image_path'])): ?>
+                            <img
+                                src="uploads/<?php echo e($tool['image_path']); ?>"
+                                alt="<?php echo e($tool['tool_name']); ?>"
+                            >
+                        <?php endif; ?>
                     </div>
 
-                    <div class="actions">
-                        <a href="edit_tool.php?id=<?php echo $tool['id']; ?>" class="btn edit">Edit</a>
-                        <a href="delete_tool.php?id=<?php echo $tool['id']; ?>" class="btn delete">Delete</a>
+                    <div class="body">
+
+                        <div class="title">
+                            <?php echo e($tool['tool_name']); ?>
+                        </div>
+
+                        <div class="location">
+                            <?php echo e($tool['location']); ?>
+                        </div>
+
+                        <div class="badge <?php echo e($tool['availability_status']); ?>">
+                            <?php echo e($tool['availability_status']); ?>
+                        </div>
+
+                        <div class="actions">
+
+                            <a
+                                href="edit_tool.php?id=<?php echo (int) $tool['id']; ?>"
+                                class="btn edit"
+                            >
+                                Edit
+                            </a>
+
+                            <form
+                                action="delete_tool.php"
+                                method="POST"
+                                class="delete-form"
+                                onsubmit="return confirm('Delete this tool listing? This cannot be undone.');"
+                            >
+                                <input
+                                    type="hidden"
+                                    name="tool_id"
+                                    value="<?php echo (int) $tool['id']; ?>"
+                                >
+
+                                <input
+                                    type="hidden"
+                                    name="csrf_token"
+                                    value="<?php echo e($deleteToken); ?>"
+                                >
+
+                                <button type="submit" class="btn delete">
+                                    Delete
+                                </button>
+                            </form>
+
+                        </div>
+
                     </div>
 
                 </div>
 
-            </div>
-
-        <?php endwhile; ?>
+            <?php endwhile; ?>
 
         </div>
 
