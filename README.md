@@ -88,4 +88,19 @@ It does not include existing accounts, tool listings, rental transactions, payme
 
 ## Deployment Status
 
-The application is currently running locally through XAMPP. The hosting provider and live URL will be added after online deployment.
+**Hosting provider:** InfinityFree
+
+**Live website:** [Niella's Rent-A-Tool](https://niellasrentatool.page.gd/login.php)
+
+InfinityFree was selected because its free PHP and MySQL hosting matches the application's existing technology stack.
+
+### Deployment on InfinityFree
+
+1. Create a hosting account with the subdomain niellasrentatool.page.gd.
+2. Create a MySQL database through the hosting control panel.
+3. Open the database in phpMyAdmin and import schema.sql.
+4. Upload the PHP application files directly into the htdocs folder.
+5. Configure the hosted db.php using the database connection details provided by the hosting control panel.
+6. Register an account, change its role to admin through phpMyAdmin, then sign in again.
+
+Online account registration and administrator login have been verified.
